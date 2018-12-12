@@ -347,6 +347,7 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
       void on_incoming_transaction_async(const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next) {
          chain::controller& chain = app().get_plugin<chain_plugin>().chain();
          if (!chain.pending_block_state()) {
+            //不存在pending区块，说明本节点目前不在产块中，将事务插入到事务集合_pending_incoming_transactions中
             _pending_incoming_transactions.emplace_back(trx, persist_until_expired, next);
             return;
          }
@@ -354,7 +355,7 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
          auto block_time = chain.pending_block_state()->header.timestamp.to_time_point();
 
          auto send_response = [this, &trx, &chain, &next](const fc::static_variant<fc::exception_ptr, transaction_trace_ptr>& response) {
-            next(response);
+            next(response); //给cleos返回信息
             if (response.contains<fc::exception_ptr>()) {
                _transaction_ack_channel.publish(std::pair<fc::exception_ptr, packed_transaction_ptr>(response.get<fc::exception_ptr>(), trx));
                if (_pending_block_mode == pending_block_mode::producing) {
@@ -384,11 +385,13 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
 
          auto id = trx->id();
          if( fc::time_point(trx->expiration()) < block_time ) {
+            //超出有效期限，返回错误信息
             send_response(std::static_pointer_cast<fc::exception>(std::make_shared<expired_tx_exception>(FC_LOG_MESSAGE(error, "expired transaction ${id}", ("id", id)) )));
             return;
          }
 
          if( chain.is_known_unexpired_transaction(id) ) {
+            //该交易已存db中，返回错误信息
             send_response(std::static_pointer_cast<fc::exception>(std::make_shared<tx_duplicate>(FC_LOG_MESSAGE(error, "duplicate transaction ${id}", ("id", id)) )));
             return;
          }
