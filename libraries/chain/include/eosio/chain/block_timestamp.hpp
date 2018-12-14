@@ -73,6 +73,7 @@ namespace eosio { namespace chain {
       }
    }; // block_timestamp
 
+// typedef block_timestamp<产块间隔时间              ,纪元时间                      > block_timestamp_type; 
    typedef block_timestamp<config::block_interval_ms,config::block_timestamp_epoch> block_timestamp_type; 
 
 } } /// eosio::chain

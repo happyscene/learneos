@@ -302,6 +302,7 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
          auto bsf = chain.create_block_state_future( block );
 
          // abort the pending block
+         // 调用abort_block会禁止本地产块
          chain.abort_block();
 
          // exceptions throw out, make sure we restart our loop
@@ -708,7 +709,7 @@ void producer_plugin::plugin_initialize(const boost::program_options::variables_
 } FC_LOG_AND_RETHROW() }
 
 void producer_plugin::plugin_startup()
-{ try {
+{try {
    auto& logger_map = fc::get_logger_map();
    if(logger_map.find(logger_name) != logger_map.end()) {
       _log = logger_map[logger_name];
@@ -750,6 +751,7 @@ void producer_plugin::plugin_startup()
       }
    }
 
+   // 产块插件初始化结束后，开启产块循环
    my->schedule_production_loop();
 
    ilog("producer plugin:  plugin_startup() end");
@@ -986,7 +988,9 @@ fc::time_point producer_plugin_impl::calculate_pending_block_time() const {
    const chain::controller& chain = app().get_plugin<chain_plugin>().chain();
    const fc::time_point now = fc::time_point::now();
    const fc::time_point base = std::max<fc::time_point>(now, chain.head_block_time());
+   // 距产下一个块的时间
    const int64_t min_time_to_next_block = (config::block_interval_us) - (base.time_since_epoch().count() % (config::block_interval_us) );
+   // 产下一个块的时间
    fc::time_point block_time = base + fc::microseconds(min_time_to_next_block);
 
 
@@ -1019,24 +1023,30 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
    _pending_block_mode = pending_block_mode::producing;
 
    // Not our turn
+   // 即将产的块是不是当前产块账号在本次产块周期的最后一个块
    last_block = ((block_timestamp_type(block_time).slot % config::producer_repetitions) == config::producer_repetitions - 1);
-   const auto& scheduled_producer = hbs->get_scheduled_producer(block_time);
+   const auto& scheduled_producer = hbs->get_scheduled_producer(block_time); // 产块账号
    auto currrent_watermark_itr = _producer_watermarks.find(scheduled_producer.producer_name);
    auto signature_provider_itr = _signature_providers.find(scheduled_producer.block_signing_key);
+   // 距产上一个不可逆块的时间
    auto irreversible_block_age = get_irreversible_block_age();
 
    // If the next block production opportunity is in the present or future, we're synced.
    if( !_production_enabled ) {
       _pending_block_mode = pending_block_mode::speculating;
    } else if( _producers.find(scheduled_producer.producer_name) == _producers.end()) {
+      // 如果产块账号不在本节点
       _pending_block_mode = pending_block_mode::speculating;
    } else if (signature_provider_itr == _signature_providers.end()) {
+      // 检查有没有签名私钥
       elog("Not producing block because I don't have the private key for ${scheduled_key}", ("scheduled_key", scheduled_producer.block_signing_key));
       _pending_block_mode = pending_block_mode::speculating;
    } else if ( _pause_production ) {
+      // 暂停产块
       elog("Not producing block because production is explicitly paused");
       _pending_block_mode = pending_block_mode::speculating;
    } else if ( _max_irreversible_block_age_us.count() >= 0 && irreversible_block_age >= _max_irreversible_block_age_us ) {
+      // 没有同步到最新的不可逆块
       elog("Not producing block because the irreversible block is too old [age:${age}s, max:${max}s]", ("age", irreversible_block_age.count() / 1'000'000)( "max", _max_irreversible_block_age_us.count() / 1'000'000 ));
       _pending_block_mode = pending_block_mode::speculating;
    }
@@ -1056,6 +1066,7 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
 
    if (_pending_block_mode == pending_block_mode::speculating) {
       auto head_block_age = now - chain.head_block_time();
+      //如果当前时间比最高块时间大于5秒，则需要等待
       if (head_block_age > fc::seconds(5))
          return start_block_result::waiting;
    }

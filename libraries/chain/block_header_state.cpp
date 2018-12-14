@@ -91,6 +91,7 @@ namespace eosio { namespace chain {
       if( pending_schedule.producers.size() &&
           dpos_irreversible_blocknum >= pending_schedule_lib_num )
       {
+         // 设置新的产块账号列表
          active_schedule = move( pending_schedule );
 
          flat_map<account_name,uint32_t> new_producer_to_last_produced;
