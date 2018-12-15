@@ -191,23 +191,26 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
             active_producers.insert(p.producer_name);
          }
 
+         // 找出本地的活跃产块账号（本地产块账号和活跃产块账号的交集）,对块签名
          std::set_intersection( _producers.begin(), _producers.end(),
                                 active_producers.begin(), active_producers.end(),
                                 boost::make_function_output_iterator( [&]( const chain::account_name& producer )
          {
+            // 如果不是此块的生产者，签名确认
             if( producer != bsp->header.producer ) {
                auto itr = std::find_if( active_producer_to_signing_key.begin(), active_producer_to_signing_key.end(),
                                         [&](const producer_key& k){ return k.producer_name == producer; } );
                if( itr != active_producer_to_signing_key.end() ) {
+                  // 获取本地产块账号私钥
                   auto private_key_itr = _signature_providers.find( itr->block_signing_key );
                   if( private_key_itr != _signature_providers.end() ) {
                      auto d = bsp->sig_digest();
-                     auto sig = private_key_itr->second( d );
-                     _last_signed_block_time = bsp->header.timestamp;
-                     _last_signed_block_num  = bsp->block_num;
+                     auto sig = private_key_itr->second( d ); // 签名
+                     _last_signed_block_time = bsp->header.timestamp; // 更新上次签名确认时间
+                     _last_signed_block_num  = bsp->block_num; // // 更新上次签名确认的块号
 
-   //                  ilog( "${n} confirmed", ("n",name(producer)) );
-                     _self->confirmed_block( { bsp->id, d, producer, sig } );
+                   //ilog( "${n} confirmed", ("n",name(producer)) );
+                     _self->confirmed_block( { bsp->id, d, producer, sig } ); // 目前没有confirmed_block的信号槽
                   }
                }
             }
@@ -223,18 +226,19 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
          auto new_bs = bsp->generate_next(new_block_header.timestamp);
 
          // for newly installed producers we can set their watermarks to the block they became active
+         // 设置新产块账号的水印，让这些账号变为活跃账号
          if (new_bs.maybe_promote_pending() && bsp->active_schedule.version != new_bs.active_schedule.version) {
             flat_set<account_name> new_producers;
             new_producers.reserve(new_bs.active_schedule.producers.size());
+            // 找出本地新加入的产块账号
             for( const auto& p: new_bs.active_schedule.producers) {
                if (_producers.count(p.producer_name) > 0)
                   new_producers.insert(p.producer_name);
             }
-
             for( const auto& p: bsp->active_schedule.producers) {
                new_producers.erase(p.producer_name);
             }
-
+            // 给本地新加入的产块账号设置水印
             for (const auto& new_producer: new_producers) {
                _producer_watermarks[new_producer] = hbn;
             }
@@ -940,7 +944,7 @@ optional<fc::time_point> producer_plugin_impl::calculate_next_block_time(const a
       return optional<fc::time_point>();
    }
 
-   size_t producer_index = itr - active_schedule.begin();
+   size_t producer_index = itr - active_schedule.begin(); // 产块账号在活跃计划表中的序号
    uint32_t minimum_offset = 1; // must at least be the "next" block
 
    // account for a watermark in the future which is disqualifying this producer for now
@@ -1038,7 +1042,7 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
       // 如果产块账号不在本节点
       _pending_block_mode = pending_block_mode::speculating;
    } else if (signature_provider_itr == _signature_providers.end()) {
-      // 检查有没有签名私钥
+      // 如果找不到签名私钥
       elog("Not producing block because I don't have the private key for ${scheduled_key}", ("scheduled_key", scheduled_producer.block_signing_key));
       _pending_block_mode = pending_block_mode::speculating;
    } else if ( _pause_production ) {
@@ -1054,6 +1058,7 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
    if (_pending_block_mode == pending_block_mode::producing) {
       // determine if our watermark excludes us from producing at this point
       if (currrent_watermark_itr != _producer_watermarks.end()) {
+         // 如果当前产块账号的水印比本节点最高块号还大，就有问题
          if (currrent_watermark_itr->second >= hbs->block_num + 1) {
             elog("Not producing block because \"${producer}\" signed a BFT confirmation OR block at a higher block number (${watermark}) than the current fork's head (${head_block_num})",
                 ("producer", scheduled_producer.producer_name)
@@ -1084,6 +1089,7 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
          if (currrent_watermark_itr != _producer_watermarks.end()) {
             auto watermark = currrent_watermark_itr->second;
             if (watermark < hbs->block_num) {
+               // 算出本产块账号需要验证的块数
                blocks_to_confirm = std::min<uint16_t>(std::numeric_limits<uint16_t>::max(), (uint16_t)(hbs->block_num - watermark));
             }
          }
@@ -1105,8 +1111,9 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
       bool exhausted = false;
 
       // remove all persisted transactions that have now expired
+      // 删除已经过期的交易
       auto& persisted_by_id = _persistent_transactions.get<by_id>();
-      auto& persisted_by_expiry = _persistent_transactions.get<by_expiry>();
+      auto& persisted_by_expiry = _persistent_transactions.get<by_expiry>(); // 按照过期时间排序
       if (!persisted_by_expiry.empty()) {
          int num_expired_persistent = 0;
          int orig_count = _persistent_transactions.size();
@@ -1136,10 +1143,11 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
          size_t orig_pending_txn_size = _pending_incoming_transactions.size();
 
          // Processing unapplied transactions...
-         //
+         // 执行未应用的交易
          if (_producers.empty() && persisted_by_id.empty()) {
             // if this node can never produce and has no persisted transactions,
             // there is no need for unapplied transactions they can be dropped
+            // 如果本节点不能产块，并且没有缓存的交易。不再需要没有被应用的交易，它们可以被丢弃。
             chain.drop_all_unapplied_transactions();
          } else {
             std::vector<transaction_metadata_ptr> apply_trxs;
@@ -1147,6 +1155,7 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
                auto unapplied_trxs = chain.get_unapplied_transactions();
                apply_trxs.reserve(unapplied_trxs.size());
 
+               // 判断交易类别
                auto calculate_transaction_category = [&](const transaction_metadata_ptr& trx) {
                   if (trx->packed_trx.expiration() < pbs->header.timestamp.to_time_point()) {
                      return tx_category::EXPIRED;
@@ -1172,12 +1181,14 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
             }
 
             if (!apply_trxs.empty()) {
-               int num_applied = 0;
-               int num_failed = 0;
-               int num_processed = 0;
+               int num_applied = 0; // 被应用成功的交易数
+               int num_failed = 0; // 应用失败的交易数
+               int num_processed = 0; // 共处理的交易数
 
                for (const auto& trx: apply_trxs) {
-                  if (block_time <= fc::time_point::now()) exhausted = true;
+                  // 如果产块时间被用完，终止循环
+                  if (block_time <= fc::time_point::now())
+                     exhausted = true;
                   if (exhausted) {
                      break;
                   }
@@ -1192,6 +1203,7 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
                         deadline = block_time;
                      }
 
+                     // 执行交易
                      auto trace = chain.push_transaction(trx, deadline);
                      if (trace->except) {
                         if (failure_is_subjective(*trace->except, deadline_is_subjective)) {
@@ -1219,6 +1231,7 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
          }
 
          if (_pending_block_mode == pending_block_mode::producing) {
+            // 删除黑名单交易列表中过期的交易
             auto& blacklist_by_id = _blacklisted_transactions.get<by_id>();
             auto& blacklist_by_expiry = _blacklisted_transactions.get<by_expiry>();
             auto now = fc::time_point::now();

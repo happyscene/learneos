@@ -1120,9 +1120,9 @@ struct controller_impl {
          EOS_ASSERT( db.revision() == head->block_num, database_exception, "db revision is not on par with head block",
                      ("db.revision()", db.revision())("controller_head_block", head->block_num)("fork_db_head_block", fork_db.head()->block_num) );
 
-         pending.emplace(maybe_session(db));
+         pending.emplace(maybe_session(db)); // 重新实例化pending
       } else {
-         pending.emplace(maybe_session());
+         pending.emplace(maybe_session()); // 重新实例化pending
       }
 
       pending->_block_status = s;
@@ -1130,6 +1130,7 @@ struct controller_impl {
       pending->_pending_block_state = std::make_shared<block_state>( *head, when ); // promotes pending schedule (if any) to active
       pending->_pending_block_state->in_current_chain = true;
 
+      // 确认confirm_block_count个块
       pending->_pending_block_state->set_confirmed(confirm_block_count);
 
       auto was_pending_promoted = pending->_pending_block_state->maybe_promote_pending();
