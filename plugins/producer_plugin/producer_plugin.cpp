@@ -1147,7 +1147,7 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
          if (_producers.empty() && persisted_by_id.empty()) {
             // if this node can never produce and has no persisted transactions,
             // there is no need for unapplied transactions they can be dropped
-            // 如果本节点不能产块，并且没有缓存的交易。不再需要没有被应用的交易，它们可以被丢弃。
+            // 如果本节点未设置产块账号，并且没有缓存的交易。不再需要没有被应用的交易，它们可以被丢弃。
             chain.drop_all_unapplied_transactions();
          } else {
             std::vector<transaction_metadata_ptr> apply_trxs;

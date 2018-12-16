@@ -1176,7 +1176,7 @@ struct controller_impl {
          } catch( ... ) {
          }
 
-         clear_expired_input_transactions();
+         clear_expired_input_transactions(); // 删除已经过期的交易
          update_producers_authority();
       }
 
@@ -1536,6 +1536,7 @@ struct controller_impl {
 
    void clear_expired_input_transactions() {
       //Look for expired transactions in the deduplication list, and remove them.
+      // 删除已经过期的交易
       auto& transaction_idx = db.get_mutable_index<transaction_multi_index>();
       const auto& dedupe_index = transaction_idx.indices().get<by_expiration>();
       auto now = self.pending_block_time();
