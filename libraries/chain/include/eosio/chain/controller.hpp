@@ -35,15 +35,15 @@ namespace eosio { namespace chain {
    class fork_database;
 
    enum class db_read_mode {
-      SPECULATIVE,
-      HEAD,
-      READ_ONLY,
-      IRREVERSIBLE
+      SPECULATIVE, // 推测模式，包括：已完成的头区块，以及还未上链的事务。
+      HEAD, // 头块模式。内容为当前头区块数据。
+      READ_ONLY, // 只读模式，只有同步进来的区块数据。
+      IRREVERSIBLE // 不可逆模式，内容为当前不可逆区块的数据。
    };
 
    enum class validation_mode {
-      FULL,
-      LIGHT
+      FULL, // 全量模式
+      LIGHT // 轻量模式
    };
 
    class controller {

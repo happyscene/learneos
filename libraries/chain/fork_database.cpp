@@ -140,9 +140,11 @@ namespace eosio { namespace chain {
 
       my->head = *my->index.get<by_lib_block_num>().begin();
 
+      // 当前最高不可逆块号
       auto lib    = my->head->dpos_irreversible_blocknum;
+      // 当前数据库中最低块
       auto oldest = *my->index.get<by_block_num>().begin();
-
+      // 如果最低块高小于最高不可逆块号，则从库中删除转为不可逆块
       if( oldest->block_num < lib ) {
          prune( oldest );
       }
@@ -212,14 +214,17 @@ namespace eosio { namespace chain {
    } /// fetch_branch_from
 
    /// remove all of the invalid forks built of this id including this id
+   // 删除大于等于传入block_id的块
    void fork_database::remove( const block_id_type& id ) {
       vector<block_id_type> remove_queue{id};
 
       for( uint32_t i = 0; i < remove_queue.size(); ++i ) {
+         // 删除传入的block_id对应的块
          auto itr = my->index.find( remove_queue[i] );
          if( itr != my->index.end() )
             my->index.erase(itr);
 
+         // 删除比传入的block_id大的块
          auto& previdx = my->index.get<by_prev>();
          auto  previtr = previdx.lower_bound(remove_queue[i]);
          while( previtr != previdx.end() && (*previtr)->header.previous == remove_queue[i] ) {
@@ -228,6 +233,7 @@ namespace eosio { namespace chain {
          }
       }
       //wdump((my->index.size()));
+      // 把最高的不可逆块设置为head
       my->head = *my->index.get<by_lib_block_num>().begin();
    }
 
@@ -263,6 +269,7 @@ namespace eosio { namespace chain {
          bni = by_bn.begin();
       }
 
+      // 回调转变为不可逆块的处理函数
       auto itr = my->index.find( h->id );
       if( itr != my->index.end() ) {
          irreversible(*itr);
@@ -270,7 +277,9 @@ namespace eosio { namespace chain {
       }
 
       auto& numidx = my->index.get<by_block_num>();
+      // 找出块号大于等于num的块
       auto nitr = numidx.lower_bound( num );
+      // 如果该块的块号和num一致，则删除
       while( nitr != numidx.end() && (*nitr)->block_num == num ) {
          auto itr_to_remove = nitr;
          ++nitr;

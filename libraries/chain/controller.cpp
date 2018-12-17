@@ -166,6 +166,7 @@ struct controller_impl {
 
       if ( read_mode == db_read_mode::SPECULATIVE ) {
          EOS_ASSERT( head->block, block_validate_exception, "attempting to pop a block that was sparsely loaded from a snapshot");
+         // 弹出分叉块之前，将块中的交易插入unapplied_transactions中
          for( const auto& t : head->trxs )
             unapplied_transactions[t->signed_id] = t;
       }
@@ -270,13 +271,14 @@ struct controller_impl {
          }
       }
 
-
+      // 持久化不可逆块
       db.commit( s->block_num );
 
       if( append_to_blog ) {
          blog.append(s->block);
       }
 
+      // 从可逆块数据库中,删除小于等于该块号的块
       const auto& ubi = reversible_blocks.get_index<reversible_block_index,by_num>();
       auto objitr = ubi.begin();
       while( objitr != ubi.end() && objitr->blocknum <= s->block_num ) {
@@ -1058,7 +1060,7 @@ struct controller_impl {
                                                     ? transaction_receipt::executed
                                                     : transaction_receipt::delayed;
                trace->receipt = push_receipt(trx->packed_trx, s, trx_context.billed_cpu_time_us, trace->net_usage);
-               pending->_pending_block_state->trxs.emplace_back(trx);
+               pending->_pending_block_state->trxs.emplace_back(trx); // 将交易插入pending区
             } else {
                transaction_receipt_header r;
                r.status = transaction_receipt::executed;
@@ -1395,7 +1397,7 @@ struct controller_impl {
                auto applied_itr = ritr.base();
                for( auto itr = applied_itr; itr != branches.first.end(); ++itr ) {
                   fork_db.mark_in_current_chain( *itr, false );
-                  pop_block();
+                  pop_block(); // 弹出分叉的块
                }
                EOS_ASSERT( self.head_block_id() == branches.second.back()->header.previous, fork_database_exception,
                            "loss of sync between fork_db and chainbase during fork switch reversal" ); // _should_ never fail
@@ -1416,6 +1418,7 @@ struct controller_impl {
    void abort_block() {
       if( pending ) {
          if ( read_mode == db_read_mode::SPECULATIVE ) {
+            // 清空pending区之前，将pending区的交易都插入unapplied_transactions中
             for( const auto& t : pending->_pending_block_state->trxs )
                unapplied_transactions[t->signed_id] = t;
          }

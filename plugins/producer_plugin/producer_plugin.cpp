@@ -1503,6 +1503,7 @@ void producer_plugin_impl::produce_block() {
 
    //idump( (fc::time_point::now() - chain.pending_block_time()) );
    chain.finalize_block();
+   // 产块账号给块签名（传入的是签名函数）
    chain.sign_block( [&]( const digest_type& d ) {
       auto debug_logger = maybe_make_debug_time_logger();
       return signature_provider_itr->second(d);
