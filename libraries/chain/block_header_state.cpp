@@ -203,7 +203,7 @@ namespace eosio { namespace chain {
         if( confirm_count[i] == 0 )
         {
            uint32_t block_num_for_i = block_num - (uint32_t)(confirm_count.size() - 1 - i);
-           dpos_proposed_irreversible_blocknum = block_num_for_i;
+           dpos_proposed_irreversible_blocknum = block_num_for_i; // 设置候选不可逆区块号
            //idump((dpos2_lib)(block_num)(dpos_irreversible_blocknum));
 
            if (i == confirm_count.size() - 1) {
