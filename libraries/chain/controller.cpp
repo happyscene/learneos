@@ -1130,12 +1130,14 @@ struct controller_impl {
 
       pending->_block_status = s;
       pending->_producer_block_id = producer_block_id;
+      // 由当前区块头创建一个新的block_state
       pending->_pending_block_state = std::make_shared<block_state>( *head, when ); // promotes pending schedule (if any) to active
       pending->_pending_block_state->in_current_chain = true;
 
-      // 确认confirm_block_count个块
+      // 确认confirm_block_count个链上的块
       pending->_pending_block_state->set_confirmed(confirm_block_count);
-
+      
+      // 把产块账号候选名单更新到活跃产块账号名单
       auto was_pending_promoted = pending->_pending_block_state->maybe_promote_pending();
 
       //modify state in speculative block only if we are speculative reads mode (other wise we need clean state for head or irreversible reads)
@@ -1155,10 +1157,10 @@ struct controller_impl {
                         ("lib", pending->_pending_block_state->dpos_irreversible_blocknum)
                         ("schedule", static_cast<producer_schedule_type>(gpo.proposed_schedule) ) );
                }
-               pending->_pending_block_state->set_new_producers( gpo.proposed_schedule );
+               pending->_pending_block_state->set_new_producers( gpo.proposed_schedule ); // 设置产块账号候选名单
                db.modify( gpo, [&]( auto& gp ) {
-                     gp.proposed_schedule_block_num = optional<block_num_type>();
-                     gp.proposed_schedule.clear();
+                     gp.proposed_schedule_block_num = optional<block_num_type>(); // 将设置产块账号推荐名单对应的块号设为无效值
+                     gp.proposed_schedule.clear(); // 清空产块账号推荐名单
                   });
             }
 
@@ -1979,6 +1981,7 @@ void controller::pop_block() {
    my->pop_block();
 }
 
+// 设置建议产块账号名单
 int64_t controller::set_proposed_producers( vector<producer_key> producers ) {
    const auto& gpo = get_global_properties();
    auto cur_block_num = head_block_num() + 1;

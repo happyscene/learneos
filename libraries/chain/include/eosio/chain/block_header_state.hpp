@@ -18,8 +18,8 @@ struct block_header_state {
     uint32_t                          bft_irreversible_blocknum = 0;
     uint32_t                          pending_schedule_lib_num = 0; /// last irr block num
     digest_type                       pending_schedule_hash;
-    producer_schedule_type            pending_schedule;
-    producer_schedule_type            active_schedule;
+    producer_schedule_type            pending_schedule; // 候选产块账号名单
+    producer_schedule_type            active_schedule; // 活跃产块账号名单
     incremental_merkle                blockroot_merkle;
     flat_map<account_name,uint32_t>   producer_to_last_produced;
     flat_map<account_name,uint32_t>   producer_to_last_implied_irb;

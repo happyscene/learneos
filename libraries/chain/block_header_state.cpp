@@ -15,8 +15,10 @@ namespace eosio { namespace chain {
       return active_schedule.producers[index];
    }
 
+   // 计算不可逆块号，将不可逆块候选名单中从小到大排，选出1/3处的块号作为不可逆块号
    uint32_t block_header_state::calc_dpos_last_irreversible()const {
-      vector<uint32_t> blocknums; blocknums.reserve( producer_to_last_implied_irb.size() );
+      vector<uint32_t> blocknums;
+      blocknums.reserve( producer_to_last_implied_irb.size() );
       for( auto& i : producer_to_last_implied_irb ) {
          blocknums.push_back(i.second);
       }
@@ -88,10 +90,11 @@ namespace eosio { namespace chain {
   } /// generate_next
 
    bool block_header_state::maybe_promote_pending() {
+      // pending_schedule_lib_num对应的块需要已经转换为不可逆块
       if( pending_schedule.producers.size() &&
           dpos_irreversible_blocknum >= pending_schedule_lib_num )
       {
-         // 设置新的产块账号列表
+         // 设置新的产块账号名单
          active_schedule = move( pending_schedule );
 
          flat_map<account_name,uint32_t> new_producer_to_last_produced;
