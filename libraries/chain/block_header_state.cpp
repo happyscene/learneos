@@ -77,11 +77,11 @@ namespace eosio { namespace chain {
        result.confirm_count.reserve( confirm_count.size() + 1 );
        result.confirm_count  = confirm_count;
        result.confirm_count.resize( confirm_count.size() + 1 );
-       result.confirm_count.back() = (uint8_t)required_confs;
+       result.confirm_count.back() = (uint8_t)required_confs; // 设置新块需要的确认次数
     } else {
        result.confirm_count.resize( confirm_count.size() );
        memcpy( &result.confirm_count[0], &confirm_count[1], confirm_count.size() - 1 );
-       result.confirm_count.back() = (uint8_t)required_confs;
+       result.confirm_count.back() = (uint8_t)required_confs; // 设置新块需要的确认次数
     }
 
     return result;
@@ -192,13 +192,14 @@ namespace eosio { namespace chain {
         std::cerr << "confirm_count["<<i<<"] = " << int(confirm_count[i]) << "\n";
      }
      */
-     header.confirmed = num_prev_blocks;
+     header.confirmed = num_prev_blocks; // 设置需要确认块的数量
 
      int32_t i = (int32_t)(confirm_count.size() - 1);
      uint32_t blocks_to_confirm = num_prev_blocks + 1; /// confirm the head block too
      while( i >= 0 && blocks_to_confirm ) {
         --confirm_count[i];
         //idump((confirm_count[i]));
+        // 如果有块的确认数目为0，则小于等于此块号的块都为不可逆
         if( confirm_count[i] == 0 )
         {
            uint32_t block_num_for_i = block_num - (uint32_t)(confirm_count.size() - 1 - i);
@@ -206,8 +207,10 @@ namespace eosio { namespace chain {
            //idump((dpos2_lib)(block_num)(dpos_irreversible_blocknum));
 
            if (i == confirm_count.size() - 1) {
+              // 全部块都被确认，清空confirm_count
               confirm_count.resize(0);
            } else {
+              // 将已完成确认块的确认数清空
               memmove( &confirm_count[0], &confirm_count[i + 1], confirm_count.size() - i  - 1);
               confirm_count.resize( confirm_count.size() - i - 1 );
            }

@@ -667,8 +667,8 @@ namespace eosio {
 
       vector<transaction_id_type> req_trx;
 
-      std::multimap<block_id_type, connection_ptr> received_blocks;
-      std::multimap<transaction_id_type, connection_ptr> received_transactions;
+      std::multimap<block_id_type, connection_ptr> received_blocks; // 标记收到的块
+      std::multimap<transaction_id_type, connection_ptr> received_transactions; // 标记收到的交易
 
       void bcast_transaction (const packed_transaction& msg);
       void rejected_transaction (const transaction_id_type& msg);
@@ -1230,9 +1230,11 @@ namespace eosio {
       auto bptr = blk_state.get<by_id>().find(entry.id);
       bool added = (bptr == blk_state.end());
       if (added){
+         // 不存在此peer，直接插入blk_state
          blk_state.insert(entry);
       }
       else {
+         // 如果已存在此peer，则更新此peer数据
          blk_state.modify(bptr,set_is_known);
          if (entry.block_num == 0) {
             blk_state.modify(bptr,update_block_num(entry.block_num));
@@ -1631,9 +1633,11 @@ namespace eosio {
       if (( large_msg_notify && msgsiz > just_send_it_max) && !skips.empty()) {
          fc_ilog(logger, "block size is ${ms}, sending notify",("ms", msgsiz));
          my_impl->send_all(pending_notify, [&skips, pbstate](connection_ptr c) -> bool {
+            // 如果connection在skips中，返回false，不向此connection广播。
             if (skips.find(c) != skips.end() || !c->current())
                return false;
 
+            // 保存此peer状态
             bool unknown = c->add_peer_block(pbstate);
             if (!unknown) {
                elog("${p} already has knowledge of block ${b}", ("p",c->peer_name())("b",pbstate.block_num));
@@ -1647,7 +1651,7 @@ namespace eosio {
             if (skips.find(cp) != skips.end() || !cp->current()) {
                continue;
             }
-            cp->add_peer_block(pbstate);
+            cp->add_peer_block(pbstate); // 保存此peer状态
             cp->enqueue( bsum );
          }
       }
@@ -1662,6 +1666,7 @@ namespace eosio {
           c->last_req->req_blocks.ids.back() == id) {
          c->last_req.reset();
       }
+      // 更新peer状态
       c->add_peer_block({id, bnum, false,true,time_point()});
 
       fc_dlog(logger, "canceling wait on ${p}", ("p",c->peer_name()));
@@ -2536,6 +2541,7 @@ namespace eosio {
       go_away_reason reason = fatal_other;
       try {
          signed_block_ptr sbp = std::make_shared<signed_block>(msg);
+         // 最终调用producer_plugin_impl::on_incoming_block函数
          chain_plug->accept_block(sbp); //, sync_master->is_active(c));
          reason = no_reason;
       } catch( const unlinkable_block_exception &ex) {

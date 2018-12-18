@@ -704,7 +704,7 @@ struct controller_impl {
       try {
          if (add_to_fork_db) {
             pending->_pending_block_state->validated = true;
-            auto new_bsp = fork_db.add(pending->_pending_block_state, true);
+            auto new_bsp = fork_db.add(pending->_pending_block_state, true); // 把pending中的block_state存入fork_db
             emit(self.accepted_block_header, pending->_pending_block_state);
             head = fork_db.head();
             EOS_ASSERT(new_bsp == head, fork_database_exception, "committed block did not become the new head in fork database");
@@ -717,6 +717,7 @@ struct controller_impl {
             });
          }
 
+         // 会调用net_plugin_impl::accepted_block函数，将块数据广播出去
          emit( self.accepted_block, pending->_pending_block_state );
       } catch (...) {
          // dont bother resetting pending, instead abort the block
