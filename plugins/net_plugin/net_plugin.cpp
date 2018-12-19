@@ -380,8 +380,8 @@ namespace eosio {
     *
     */
    struct peer_block_state {
-      block_id_type id;
-      uint32_t      block_num;
+      block_id_type id; // 块id
+      uint32_t      block_num; // 块号
       bool          is_known;
       bool          is_noticed;
       time_point    requested_time;
@@ -444,7 +444,7 @@ namespace eosio {
       {}
       uint32_t     start_block;
       uint32_t     end_block;
-      uint32_t     last; ///< last sent or received
+      uint32_t     last; ///< last sent or received 上一次发送或接收的块号
       time_point   start_time; ///< time request made or received
    };
 
@@ -465,8 +465,8 @@ namespace eosio {
       optional<sync_state>    peer_requested;  // this peer is requesting info from us
       socket_ptr              socket;
 
-      fc::message_buffer<1024*1024>    pending_message_buffer;
-      fc::optional<std::size_t>        outstanding_read_bytes;
+      fc::message_buffer<1024*1024>    pending_message_buffer; // 接收数据缓存
+      fc::optional<std::size_t>        outstanding_read_bytes; // 剩余未接收的数据长度
       vector<char>            blk_buffer;
 
       struct queued_write {
@@ -628,16 +628,16 @@ namespace eosio {
    class sync_manager {
    private:
       enum stages {
-         lib_catchup,
-         head_catchup,
-         in_sync
+         lib_catchup, // 同步不可逆块
+         head_catchup, // 同步块头
+         in_sync // 一致
       };
 
-      uint32_t       sync_known_lib_num;
-      uint32_t       sync_last_requested_num;
+      uint32_t       sync_known_lib_num; // 已知链上最高不可逆块号
+      uint32_t       sync_last_requested_num; // 已同步块号
       uint32_t       sync_next_expected_num;
-      uint32_t       sync_req_span;
-      connection_ptr source;
+      uint32_t       sync_req_span; // 一次请求同步的块数
+      connection_ptr source; // 正在同步块的连接
       stages         state;
 
       chain_plugin* chain_plug = nullptr;
@@ -744,6 +744,7 @@ namespace eosio {
       return (socket && socket->is_open() && !connecting);
    }
 
+   // 是否可立即发送数据
    bool connection::current() {
       return (connected() && !syncing);
    }
@@ -1201,12 +1202,15 @@ namespace eosio {
          // This must be done before we unpack the message.
          // This code is copied from fc::io::unpack(..., unsigned_int)
          auto index = pending_message_buffer.read_index();
-         uint64_t which = 0; char b = 0; uint8_t by = 0;
+         uint64_t which = 0;
+         char b = 0;
+         uint8_t by = 0;
+         // 读取内容长度
          do {
-            pending_message_buffer.peek(&b, 1, index);
+            pending_message_buffer.peek(&b, 1, index); // 按照位置和长度拷贝内容到b，然后index按照读取长度前移
             which |= uint32_t(uint8_t(b) & 0x7f) << by;
             by += 7;
-         } while( uint8_t(b) & 0x80 && by < 32);
+         } while( uint8_t(b) & 0x80 && by < 32); // 如果第八位是1，继续读取长度
 
          if (which == uint64_t(net_message::tag<signed_block>::value)) {
             blk_buffer.resize(message_length);
@@ -1217,7 +1221,7 @@ namespace eosio {
          net_message msg;
          fc::raw::unpack(ds, msg);
          msgHandler m(impl, shared_from_this() );
-         msg.visit(m);
+         msg.visit(m); // 此处具体调用：将msg中的数据传入m重载的operater()方法中
       } catch(  const fc::exception& e ) {
          edump((e.to_detail_string() ));
          impl.close( shared_from_this() );
@@ -1230,11 +1234,11 @@ namespace eosio {
       auto bptr = blk_state.get<by_id>().find(entry.id);
       bool added = (bptr == blk_state.end());
       if (added){
-         // 不存在此peer，直接插入blk_state
+         // 不存在此peer_block，直接插入blk_state
          blk_state.insert(entry);
       }
       else {
-         // 如果已存在此peer，则更新此peer数据
+         // 如果已存在此peer_block，则更新此peer数据
          blk_state.modify(bptr,set_is_known);
          if (entry.block_num == 0) {
             blk_state.modify(bptr,update_block_num(entry.block_num));
@@ -1288,12 +1292,13 @@ namespace eosio {
    }
 
    void sync_manager::reset_lib_num(connection_ptr c) {
+      // 如果块和链是一致的，重置source
       if(state == in_sync) {
          source.reset();
       }
-      if( c->current() ) {
+      if( c->current() ) { // 连接c可用
          if( c->last_handshake_recv.last_irreversible_block_num > sync_known_lib_num) {
-            sync_known_lib_num =c->last_handshake_recv.last_irreversible_block_num;
+            sync_known_lib_num = c->last_handshake_recv.last_irreversible_block_num;
          }
       } else if( c == source ) {
          sync_last_requested_num = 0;
@@ -1301,12 +1306,12 @@ namespace eosio {
       }
    }
 
-   bool sync_manager::sync_required( ) {
+   bool sync_manager::sync_required() {
       fc_dlog(logger, "last req = ${req}, last recv = ${recv} known = ${known} our head = ${head}",
               ("req",sync_last_requested_num)("recv",sync_next_expected_num)("known",sync_known_lib_num)("head",chain_plug->chain( ).fork_db_head_block_num( )));
 
       return( sync_last_requested_num < sync_known_lib_num ||
-              chain_plug->chain( ).fork_db_head_block_num( ) < sync_last_requested_num );
+              chain_plug->chain().fork_db_head_block_num() < sync_last_requested_num );
    }
 
    void sync_manager::request_next_chunk( connection_ptr conn ) {
@@ -1379,15 +1384,15 @@ namespace eosio {
       }
 
       if( sync_last_requested_num != sync_known_lib_num ) {
-         uint32_t start = sync_next_expected_num;
-         uint32_t end = start + sync_req_span - 1;
+         uint32_t start = sync_next_expected_num; // 同步块范围的最小块号
+         uint32_t end = start + sync_req_span - 1;  // 同步块范围的最大块号
          if( end > sync_known_lib_num )
             end = sync_known_lib_num;
          if( end > 0 && end >= start ) {
             fc_ilog(logger, "requesting range ${s} to ${e}, from ${n}",
                     ("n",source->peer_name())("s",start)("e",end));
             source->request_sync_blocks(start, end);
-            sync_last_requested_num = end;
+            sync_last_requested_num = end; // 修改将已同步块号
          }
       }
    }
@@ -1402,6 +1407,7 @@ namespace eosio {
    }
 
    void sync_manager::start_sync( connection_ptr c, uint32_t target) {
+      // 如果target大于已知最高块号，则将已知最高块号改为target
       if( target > sync_known_lib_num) {
          sync_known_lib_num = target;
       }
@@ -1436,10 +1442,10 @@ namespace eosio {
       }
    }
 
-   void sync_manager::recv_handshake (connection_ptr c, const handshake_message &msg) {
+   void sync_manager::recv_handshake(connection_ptr c, const handshake_message &msg) {
       controller& cc = chain_plug->chain();
-      uint32_t lib_num = cc.last_irreversible_block_num( );
-      uint32_t peer_lib = msg.last_irreversible_block_num;
+      uint32_t lib_num = cc.last_irreversible_block_num( ); // 本节点的不可逆块号
+      uint32_t peer_lib = msg.last_irreversible_block_num; // 对方的不可逆块号
       reset_lib_num(c);
       c->syncing = false;
 
@@ -1455,8 +1461,10 @@ namespace eosio {
       //
       //-----------------------------
 
-      uint32_t head = cc.fork_db_head_block_num( );
+      uint32_t head = cc.fork_db_head_block_num();
       block_id_type head_id = cc.fork_db_head_block_id();
+      
+      // 本地的最高块id和对方id一致，不需要同步
       if (head_id == msg.head_id) {
          fc_dlog(logger, "sync check state 0");
          // notify peer of our pending transactions
@@ -1467,6 +1475,8 @@ namespace eosio {
          c->enqueue( note );
          return;
       }
+
+      // 本地最高块号小于对方最高不可逆块号，需开启同步
       if (head < peer_lib) {
          fc_dlog(logger, "sync check state 1");
          // wait for receipt of a notice message before initiating sync
@@ -1475,6 +1485,8 @@ namespace eosio {
          }
          return;
       }
+
+      // 本地最高不可逆块号大于对方最高块号，则通知对方
       if (lib_num > msg.head_num ) {
          fc_dlog(logger, "sync check state 2");
          if (msg.generation > 1 || c->protocol_version > proto_base) {
@@ -1490,12 +1502,14 @@ namespace eosio {
       }
 
       if (head <= msg.head_num ) {
+         // 如果本地最高块号小于对方最高块号，则需判断是否需要同步块头信息
          fc_dlog(logger, "sync check state 3");
          verify_catchup (c, msg.head_num, msg.head_id);
          return;
       }
       else {
          fc_dlog(logger, "sync check state 4");
+         // 如果不是第一次握手，则发送一个catch_up消息
          if (msg.generation > 1 ||  c->protocol_version > proto_base) {
             notice_message note;
             note.known_trx.mode = none;
@@ -1514,8 +1528,7 @@ namespace eosio {
       request_message req;
       req.req_blocks.mode = catch_up;
       for (auto cc : my_impl->connections) {
-         if (cc->fork_head == id ||
-             cc->fork_head_num > num) {
+         if (cc->fork_head == id || cc->fork_head_num > num) {
             req.req_blocks.mode = none;
             break;
          }
@@ -1554,6 +1567,7 @@ namespace eosio {
    }
 
    void sync_manager::rejected_block (connection_ptr c, uint32_t blk_num) {
+      // 断掉连接，重新发送握手消息
       if (state != in_sync ) {
          fc_ilog (logger, "block ${bn} not accepted from ${p}",("bn",blk_num)("p",c->peer_name()));
          sync_last_requested_num = 0;
@@ -1566,12 +1580,13 @@ namespace eosio {
    void sync_manager::recv_block (connection_ptr c, const block_id_type &blk_id, uint32_t blk_num) {
       fc_dlog(logger," got block ${bn} from ${p}",("bn",blk_num)("p",c->peer_name()));
       if (state == lib_catchup) {
+         // 如果接收到块的块号和期望获得块的块号不一致，则发生异常断掉此连接
          if (blk_num != sync_next_expected_num) {
             fc_ilog (logger, "expected block ${ne} but got ${bn}",("ne",sync_next_expected_num)("bn",blk_num));
             my_impl->close(c);
             return;
          }
-         sync_next_expected_num = blk_num + 1;
+         sync_next_expected_num = blk_num + 1; // 接收到期望的块后，把期望接收块号加一
       }
       if (state == head_catchup) {
          fc_dlog (logger, "sync_manager in head_catchup state");
@@ -1594,14 +1609,17 @@ namespace eosio {
       }
       else if (state == lib_catchup) {
          if( blk_num == sync_known_lib_num ) {
+            // 如果接收块的块号和已知最高块号相同，则重新发送握手消息
             fc_dlog( logger, "All caught up with last known last irreversible block resending handshake");
-            set_state(in_sync);
+            set_state(in_sync); // 将链状态改为一致
             send_handshakes();
          }
          else if (blk_num == sync_last_requested_num) {
+            // 如果接收块的块号和上一次同步块号相同，则继续请求同步块
             request_next_chunk();
          }
          else {
+            // 此连接改为等待状态
             fc_dlog(logger,"calling sync_wait on connection ${p}",("p",c->peer_name()));
             c->sync_wait();
          }
@@ -1651,7 +1669,7 @@ namespace eosio {
             if (skips.find(cp) != skips.end() || !cp->current()) {
                continue;
             }
-            cp->add_peer_block(pbstate); // 保存此peer状态
+            cp->add_peer_block(pbstate); // 保存此peer_block
             cp->enqueue( bsum );
          }
       }
@@ -1666,7 +1684,7 @@ namespace eosio {
           c->last_req->req_blocks.ids.back() == id) {
          c->last_req.reset();
       }
-      // 更新peer状态
+      // 保存peer_block
       c->add_peer_block({id, bnum, false,true,time_point()});
 
       fc_dlog(logger, "canceling wait on ${p}", ("p",c->peer_name()));
@@ -1921,8 +1939,8 @@ namespace eosio {
          return;
       }
 
-      auto host = c->peer_addr.substr( 0, colon );
-      auto port = c->peer_addr.substr( colon + 1);
+      auto host = c->peer_addr.substr( 0, colon ); // ip地址
+      auto port = c->peer_addr.substr( colon + 1); // 端口
       idump((host)(port));
       tcp::resolver::query query( tcp::v4(), host.c_str(), port.c_str() );
       connection_wptr weak_conn = c;
@@ -1954,14 +1972,15 @@ namespace eosio {
       c->socket->async_connect( current_endpoint, [weak_conn, endpoint_itr, this] ( const boost::system::error_code& err ) {
             auto c = weak_conn.lock();
             if (!c) return;
+            // 如果连接未出异常并且socket处于open状态，则接收会话的数据
             if( !err && c->socket->is_open() ) {
                if (start_session( c )) {
-                  c->send_handshake ();
+                  c->send_handshake (); // 发送握手消息
                }
             } else {
                if( endpoint_itr != tcp::resolver::iterator() ) {
                   close(c);
-                  connect( c, endpoint_itr );
+                  connect( c, endpoint_itr ); // 连接失败。重新连接
                }
                else {
                   elog( "connection failed to ${peer}: ${error}",
@@ -1985,8 +2004,8 @@ namespace eosio {
          return false;
       }
       else {
-         start_read_message( con );
-         ++started_sessions;
+         start_read_message( con ); // 从此连接接收数据
+         ++started_sessions; // 启动会话数加一
          return true;
          // for now, we can just use the application main loop.
          //     con->readloop_complete  = bf::async( [=](){ read_loop( con ); } );
@@ -1999,15 +2018,17 @@ namespace eosio {
       auto socket = std::make_shared<tcp::socket>( std::ref( app().get_io_service() ) );
       acceptor->async_accept( *socket, [socket,this]( boost::system::error_code ec ) {
             if( !ec ) {
-               uint32_t visitors = 0;
-               uint32_t from_addr = 0;
-               auto paddr = socket->remote_endpoint(ec).address();
+               uint32_t visitors = 0; // 来自外部的连接数
+               uint32_t from_addr = 0; // 来自同一个ip的连接数
+               auto paddr = socket->remote_endpoint(ec).address(); // 连接进来的ip
                if (ec) {
                   fc_elog(logger,"Error getting remote endpoint: ${m}",("m", ec.message()));
                }
                else {
                   for (auto &conn : connections) {
                      if(conn->socket->is_open()) {
+                        // 主动向外发出的网络连接，peer_addr是被赋过值的。
+                        // 如peer_addr为空，则是外部连入的。
                         if (conn->peer_addr.empty()) {
                            visitors++;
                            boost::system::error_code ec;
@@ -2024,8 +2045,8 @@ namespace eosio {
                   if( from_addr < max_nodes_per_host && (max_client_count == 0 || num_clients < max_client_count )) {
                      ++num_clients;
                      connection_ptr c = std::make_shared<connection>( socket );
-                     connections.insert( c );
-                     start_session( c );
+                     connections.insert( c ); // 保存连接
+                     start_session( c ); // 开始接收数据
 
                   }
                   else {
@@ -2055,7 +2076,7 @@ namespace eosio {
                      return;
                }
             }
-            start_listen_loop();
+            start_listen_loop(); // 继续监听
          });
    }
 
@@ -2103,15 +2124,15 @@ namespace eosio {
                      EOS_ASSERT(bytes_transferred <= conn->pending_message_buffer.bytes_to_write(), plugin_exception, "");
                      conn->pending_message_buffer.advance_write_ptr(bytes_transferred);
                      while (conn->pending_message_buffer.bytes_to_read() > 0) {
-                        uint32_t bytes_in_buffer = conn->pending_message_buffer.bytes_to_read();
+                        uint32_t bytes_in_buffer = conn->pending_message_buffer.bytes_to_read(); // 缓存中还可读取内容的长度
 
                         if (bytes_in_buffer < message_header_size) {
                            conn->outstanding_read_bytes.emplace(message_header_size - bytes_in_buffer);
                            break;
                         } else {
                            uint32_t message_length;
-                           auto index = conn->pending_message_buffer.read_index();
-                           conn->pending_message_buffer.peek(&message_length, sizeof(message_length), index);
+                           auto index = conn->pending_message_buffer.read_index(); // 读取位置
+                           conn->pending_message_buffer.peek(&message_length, sizeof(message_length), index); // 获取message_length
                            if(message_length > def_send_buffer_size*2 || message_length == 0) {
                               boost::system::error_code ec;
                               elog("incoming message length unexpected (${i}), from ${p}", ("i", message_length)("p",boost::lexical_cast<std::string>(conn->socket->remote_endpoint(ec))));
@@ -2119,21 +2140,23 @@ namespace eosio {
                               return;
                            }
 
-                           auto total_message_bytes = message_length + message_header_size;
+                           auto total_message_bytes = message_length + message_header_size; // 数据总长度
 
                            if (bytes_in_buffer >= total_message_bytes) {
+                              // 此消息的数据接收完毕，则分发处理
                               conn->pending_message_buffer.advance_read_ptr(message_header_size);
                               if (!conn->process_next_message(*this, message_length)) {
                                  return;
                               }
                            } else {
-                              auto outstanding_message_bytes = total_message_bytes - bytes_in_buffer;
-                              auto available_buffer_bytes = conn->pending_message_buffer.bytes_to_write();
+                              auto outstanding_message_bytes = total_message_bytes - bytes_in_buffer; // 此消息还未接收数据的长度
+                              auto available_buffer_bytes = conn->pending_message_buffer.bytes_to_write(); // 缓存空间剩余长度
                               if (outstanding_message_bytes > available_buffer_bytes) {
+                                 // 还未接收数据大于剩余空间长度，扩充缓存长度
                                  conn->pending_message_buffer.add_space( outstanding_message_bytes - available_buffer_bytes );
                               }
 
-                              conn->outstanding_read_bytes.emplace(outstanding_message_bytes);
+                              conn->outstanding_read_bytes.emplace(outstanding_message_bytes); // 设置剩余未接收数据长度
                               break;
                            }
                         }
@@ -2576,10 +2599,10 @@ namespace eosio {
                c->trx_state.modify( ctx, ubn );
             }
          }
-         sync_master->recv_block(c, blk_id, blk_num);
+         sync_master->recv_block(c, blk_id, blk_num); // 将期望块号加一
       }
       else {
-         sync_master->rejected_block(c, blk_num);
+         sync_master->rejected_block(c, blk_num); // 如果出现异常，断掉连接重新发送握手消息
       }
    }
 
@@ -2928,10 +2951,10 @@ namespace eosio {
             auto host = my->p2p_address.substr( 0, my->p2p_address.find( ':' ));
             auto port = my->p2p_address.substr( host.size() + 1, my->p2p_address.size());
             idump((host)( port ));
-            tcp::resolver::query query( tcp::v4(), host.c_str(), port.c_str());
+            tcp::resolver::query query( tcp::v4(), host.c_str(), port.c_str()); // 设置监听的ip和端口
             // Note: need to add support for IPv6 too?
 
-            my->listen_endpoint = *my->resolver->resolve( query );
+            my->listen_endpoint = *my->resolver->resolve( query ); // 监听端点
 
             my->acceptor.reset( new tcp::acceptor( app().get_io_service()));
          }
@@ -3006,6 +3029,7 @@ namespace eosio {
    }
 
    void net_plugin::plugin_startup() {
+      // 如果监听器实例化，则开启端点监听
       if( my->acceptor ) {
          my->acceptor->open(my->listen_endpoint.protocol());
          my->acceptor->set_option(tcp::acceptor::reuse_address(true));
@@ -3016,7 +3040,7 @@ namespace eosio {
              ("port", my->listen_endpoint.port()));
            throw e;
          }
-         my->acceptor->listen();
+         my->acceptor->listen(); // 开始监听
          ilog("starting listener, max clients is ${mc}",("mc",my->max_client_count));
          my->start_listen_loop();
       }
@@ -3038,7 +3062,8 @@ namespace eosio {
       }
 
       my->start_monitors();
-
+      
+      // 连接启动配置中的p2p地址
       for( auto seed_node : my->supplied_peers ) {
          connect( seed_node );
       }
@@ -3079,9 +3104,9 @@ namespace eosio {
       if( my->find_connection( host ) )
          return "already connected";
 
-      connection_ptr c = std::make_shared<connection>(host);
+      connection_ptr c = std::make_shared<connection>(host); // 此种实例化connection，会给peer_addr赋值
       fc_dlog(logger,"adding new connection to the list");
-      my->connections.insert( c );
+      my->connections.insert( c );  // 保存连接
       fc_dlog(logger,"calling active connector");
       my->connect( c );
       return "added connection";
