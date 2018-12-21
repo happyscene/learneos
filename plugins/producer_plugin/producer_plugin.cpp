@@ -697,6 +697,7 @@ void producer_plugin::plugin_initialize(const boost::program_options::variables_
       my->on_incoming_block(block);
    });
 
+   // 在read_write::push_transactio和net_plugin_impl::handle_message中调用
    my->_incoming_transaction_async_provider = app().get_method<incoming::methods::transaction_async>().register_provider([this](const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next) -> void {
       return my->on_incoming_transaction_async(trx, persist_until_expired, next );
    });
@@ -1071,7 +1072,7 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
 
    if (_pending_block_mode == pending_block_mode::speculating) {
       auto head_block_age = now - chain.head_block_time();
-      //如果当前时间比最高块时间大于5秒，则需要等待
+      // 如果当前时间比最高块时间大于5秒，则等待同步快
       if (head_block_age > fc::seconds(5))
          return start_block_result::waiting;
    }

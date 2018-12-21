@@ -688,8 +688,8 @@ namespace chainbase {
    {
       public:
          enum open_flags {
-            read_only     = 0,
-            read_write    = 1
+            read_only     = 0, // 只读权限
+            read_write    = 1 // 读写权限
          };
 
          using database_index_row_count_multiset = std::multiset<std::pair<unsigned, std::string>>;
