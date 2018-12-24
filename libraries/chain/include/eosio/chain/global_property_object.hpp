@@ -29,9 +29,9 @@ namespace eosio { namespace chain {
       OBJECT_CTOR(global_property_object, (proposed_schedule))
 
       id_type                           id;
-      optional<block_num_type>          proposed_schedule_block_num;
-      shared_producer_schedule_type     proposed_schedule;
-      chain_config                      configuration;
+      optional<block_num_type>          proposed_schedule_block_num; // 设置产块账号推荐名单时的块号
+      shared_producer_schedule_type     proposed_schedule; // 产块账号推荐名单
+      chain_config                      configuration; // 链配置
    };
 
 
@@ -50,7 +50,7 @@ namespace eosio { namespace chain {
         OBJECT_CTOR(dynamic_global_property_object)
 
         id_type    id;
-        uint64_t   global_action_sequence = 0;
+        uint64_t   global_action_sequence = 0; // 全局action执行序号
    };
 
    using global_property_multi_index = chainbase::shared_multi_index_container<

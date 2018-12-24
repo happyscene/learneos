@@ -352,7 +352,7 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
       void on_incoming_transaction_async(const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next) {
          chain::controller& chain = app().get_plugin<chain_plugin>().chain();
          if (!chain.pending_block_state()) {
-            //不存在pending区块，说明本节点目前不在产块中，将事务插入到事务集合_pending_incoming_transactions中
+            //不存在pending区块，将事务插入到事务集合_pending_incoming_transactions中
             _pending_incoming_transactions.emplace_back(trx, persist_until_expired, next);
             return;
          }
