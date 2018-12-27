@@ -129,10 +129,10 @@ public:
    }
 
    optional<signature_type> try_sign_digest( const digest_type digest, const public_key_type public_key ) {
-      auto it = _keys.find(public_key);
+      auto it = _keys.find(public_key); // 根据public key获取private key
       if( it == _keys.end() )
          return optional<signature_type>{};
-      return it->second.sign(digest);
+      return it->second.sign(digest); // 签名
    }
 
    private_key_type get_private_key(const public_key_type& id)const

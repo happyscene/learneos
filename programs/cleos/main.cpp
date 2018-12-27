@@ -288,17 +288,20 @@ void prompt_for_wallet_password(string& pw, const string& name) {
 fc::variant determine_required_keys(const signed_transaction& trx) {
    // TODO better error checking
    //wdump((trx));
+   // 拉取本地所有的public keys，这些key中可能拥有account@publish权限
    const auto& public_keys = call(wallet_url, wallet_public_keys);
+   // trx包含action，action包含account@publish权限信息
    auto get_arg = fc::mutable_variant_object
            ("transaction", (transaction)trx)
            ("available_keys", public_keys);
+   // 调用keosd的服务，获取本地满足account@publish权限的public key
    const auto& required_keys = call(get_required_keys, get_arg);
    return required_keys["required_keys"];
 }
 
 void sign_transaction(signed_transaction& trx, fc::variant& required_keys, const chain_id_type& chain_id) {
    fc::variants sign_args = {fc::variant(trx), required_keys, fc::variant(chain_id)};
-   const auto& signed_trx = call(wallet_url, wallet_sign_trx, sign_args);
+   const auto& signed_trx = call(wallet_url, wallet_sign_trx, sign_args); // cleos调用keosd的sign_trx api来执行签名操作
    trx = signed_trx.as<signed_transaction>();
 }
 
@@ -329,12 +332,12 @@ fc::variant push_transaction( signed_transaction& trx, int32_t extra_kcpu = 1000
    }
 
    if (!tx_skip_sign) {
-      auto required_keys = determine_required_keys(trx);
-      sign_transaction(trx, required_keys, info.chain_id);
+      auto required_keys = determine_required_keys(trx); // 获取被授权的public key
+      sign_transaction(trx, required_keys, info.chain_id); // 通过签名交易提交permission证明
    }
 
    if (!tx_dont_broadcast) {
-      return call(push_txn_func, packed_transaction(trx, compression));
+      return call(push_txn_func, packed_transaction(trx, compression)); // 发送交易
    } else {
       if (!tx_return_packed) {
         return fc::variant(trx);

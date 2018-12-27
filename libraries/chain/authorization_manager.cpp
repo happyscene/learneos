@@ -580,12 +580,14 @@ namespace eosio { namespace chain {
 
       for (const auto& act : trx.actions ) {
          for (const auto& declared_auth : act.authorization) {
+            //判断candidate_keys是否有合适的key被授予了act.authorization
             EOS_ASSERT( checker.satisfied(declared_auth), unsatisfied_authorization,
                         "transaction declares authority '${auth}', but does not have signatures for it.",
                         ("auth", declared_auth) );
          }
       }
 
+      //返回满足条件的public key
       return checker.used_keys();
    }
 

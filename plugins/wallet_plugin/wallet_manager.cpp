@@ -236,9 +236,10 @@ wallet_manager::sign_transaction(const chain::signed_transaction& txn, const fla
       bool found = false;
       for (const auto& i : wallets) {
          if (!i.second->is_locked()) {
+            // 在try_sign_digest中，根据public key获取private key，使用private key签名，此处不能被伪造
             optional<signature_type> sig = i.second->try_sign_digest(stxn.sig_digest(id, stxn.context_free_data), pk);
             if (sig) {
-               stxn.signatures.push_back(*sig);
+               stxn.signatures.push_back(*sig); // 保存签名
                found = true;
                break; // inner for
             }
