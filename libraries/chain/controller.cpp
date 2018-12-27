@@ -1040,9 +1040,10 @@ struct controller_impl {
             trx_context.delay = fc::seconds(trx->trx.delay_sec);
 
             if( !self.skip_auth_check() && !trx->implicit ) {
+               // 校验权重
                authorization.check_authorization(
                        trx->trx.actions,
-                       trx->recover_keys( chain_id ),
+                       trx->recover_keys( chain_id ), // 从签名里获取action发起者的public key（此处仔细看一下......）
                        {},
                        trx_context.delay,
                        [](){}
