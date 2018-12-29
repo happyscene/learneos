@@ -504,6 +504,7 @@ namespace eosio { namespace chain {
       // ascending order of the actor name with ties broken by ascending order of the permission name.
       for( const auto& p : permissions_to_satisfy ) {
          checktime(); // TODO: this should eventually move into authority_checker instead
+         // 此处真正执行权限检查
          EOS_ASSERT( checker.satisfied( p.first, p.second ), unsatisfied_authorization,
                      "transaction declares authority '${auth}', "
                      "but does not have signatures for it under a provided delay of ${provided_delay} ms, "
@@ -519,6 +520,7 @@ namespace eosio { namespace chain {
       }
 
       if( !allow_unused_keys ) {
+         // 检验是不是所有public key对应的权重都参与了计算
          EOS_ASSERT( checker.all_keys_used(), tx_irrelevant_sig,
                      "transaction bears irrelevant signatures from these keys: ${keys}",
                      ("keys", checker.unused_keys()) );

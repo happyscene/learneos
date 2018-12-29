@@ -31,10 +31,10 @@ namespace eosio { namespace chain {
 
       id_type                           id;
       permission_usage_object::id_type  usage_id;
-      id_type                           parent; ///< parent permission
-      account_name                      owner; ///< the account this permission belongs to
-      permission_name                   name; ///< human-readable name for the permission
-      time_point                        last_updated; ///< the last time this authority was updated
+      id_type                           parent; ///< parent permission 父权限许可
+      account_name                      owner; ///< the account this permission belongs to 权限许可的拥有者
+      permission_name                   name; ///< human-readable name for the permission 权限许可的名称
+      time_point                        last_updated; ///< the last time this authority was updated 最后一次更新时间
       shared_authority                  auth; ///< authority required to execute this permission
 
 

@@ -69,12 +69,13 @@ transaction_id_type transaction::id() const {
    return enc.result();
 }
 
+// 计算交易的哈希值
 digest_type transaction::sig_digest( const chain_id_type& chain_id, const vector<bytes>& cfd )const {
    digest_type::encoder enc;
-   fc::raw::pack( enc, chain_id );
-   fc::raw::pack( enc, *this );
+   fc::raw::pack( enc, chain_id ); // 链ID
+   fc::raw::pack( enc, *this ); // 交易数据
    if( cfd.size() ) {
-      fc::raw::pack( enc, digest_type::hash(cfd) );
+      fc::raw::pack( enc, digest_type::hash(cfd) ); // context free data
    } else {
       fc::raw::pack( enc, digest_type() );
    }
@@ -88,7 +89,7 @@ flat_set<public_key_type> transaction::get_signature_keys( const vector<signatur
 
    constexpr size_t recovery_cache_size = 1000;
    static thread_local recovery_cache_type recovery_cache;
-   const digest_type digest = sig_digest(chain_id, cfd);
+   const digest_type digest = sig_digest(chain_id, cfd); // 交易的哈希值
 
    flat_set<public_key_type> recovered_pub_keys;
    for(const signature_type& sig : signatures) {

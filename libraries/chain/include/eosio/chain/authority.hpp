@@ -11,7 +11,7 @@
 
 namespace eosio { namespace chain {
 
-
+// 许可权限对应的权重
 struct permission_level_weight {
    permission_level  permission;
    weight_type       weight;
@@ -21,6 +21,7 @@ struct permission_level_weight {
    }
 };
 
+// 公钥对应的权限
 struct key_weight {
    public_key_type key;
    weight_type     weight;
@@ -30,6 +31,7 @@ struct key_weight {
    }
 };
 
+// trx延时对应的权重
 struct wait_weight {
    uint32_t     wait_sec;
    weight_type  weight;
@@ -71,9 +73,9 @@ struct authority {
    authority(){}
 
    uint32_t                          threshold = 0;
-   vector<key_weight>                keys;
-   vector<permission_level_weight>   accounts;
-   vector<wait_weight>               waits;
+   vector<key_weight>                keys; // 许可权限对应的权重
+   vector<permission_level_weight>   accounts; // 公钥对应的权限
+   vector<wait_weight>               waits; // trx延时对应的权重
 
    friend bool operator == ( const authority& lhs, const authority& rhs ) {
       return tie( lhs.threshold, lhs.keys, lhs.accounts, lhs.waits ) == tie( rhs.threshold, rhs.keys, rhs.accounts, rhs.waits );

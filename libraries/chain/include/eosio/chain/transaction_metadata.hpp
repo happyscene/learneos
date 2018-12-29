@@ -41,6 +41,7 @@ class transaction_metadata {
 
       const flat_set<public_key_type>& recover_keys( const chain_id_type& chain_id ) {
          // Unlikely for more than one chain_id to be used in one nodeos instance
+         // 在一条链上不可能有一个以上的chain id
          if( !signing_keys || signing_keys->first != chain_id ) {
             if( signing_keys_future.valid() ) {
                signing_keys = signing_keys_future.get();

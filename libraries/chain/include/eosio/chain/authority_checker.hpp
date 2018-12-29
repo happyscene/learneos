@@ -60,13 +60,13 @@ namespace detail {
    template<typename PermissionToAuthorityFunc>
    class authority_checker {
       private:
-         PermissionToAuthorityFunc            permission_to_authority;
+         PermissionToAuthorityFunc            permission_to_authority; // 根据permission_level实例获取auth的函数对象
          const std::function<void()>&         checktime;
          vector<public_key_type>              provided_keys; // Making this a flat_set<public_key_type> causes runtime problems with utilities::filter_data_by_marker for some reason. TODO: Figure out why.
          flat_set<permission_level>           provided_permissions;
-         vector<bool>                         _used_keys;
+         vector<bool>                         _used_keys; // 标记provided_key对应的权重是不是参与计算
          fc::microseconds                     provided_delay;
-         uint16_t                             recursion_depth_limit;
+         uint16_t                             recursion_depth_limit; // 回溯深度
 
       public:
          authority_checker( PermissionToAuthorityFunc            permission_to_authority,
@@ -88,9 +88,9 @@ namespace detail {
          }
 
          enum permission_cache_status {
-            being_evaluated,
-            permission_unsatisfied,
-            permission_satisfied
+            being_evaluated, // 还在求值中
+            permission_unsatisfied, // 不满足
+            permission_satisfied // 满足
          };
 
          typedef map<permission_level, permission_cache_status> permission_cache_type;
@@ -203,6 +203,7 @@ namespace detail {
             return false;
          }
 
+         // 权重和计算器
          struct weight_tally_visitor {
             using result_type = uint32_t;
 
@@ -217,6 +218,7 @@ namespace detail {
             ,recursion_depth(recursion_depth)
             {}
 
+            // 计算trx延迟权重和
             uint32_t operator()(const wait_weight& permission) {
                if( checker.provided_delay >= fc::seconds(permission.wait_sec) ) {
                   total_weight += permission.weight;
@@ -224,6 +226,7 @@ namespace detail {
                return total_weight;
             }
 
+            // 计算公钥权重和
             uint32_t operator()(const key_weight& permission) {
                auto itr = boost::find( checker.provided_keys, permission.key );
                if( itr != checker.provided_keys.end() ) {
@@ -233,7 +236,9 @@ namespace detail {
                return total_weight;
             }
 
+            // 计算许可权限权重和
             uint32_t operator()(const permission_level_weight& permission) {
+               // 如果许可权限在缓存中，直接增加权重，不需校验
                auto status = authority_checker::permission_status_in_cache( cached_permissions, permission.permission );
                if( !status ) {
                   if( recursion_depth < checker.recursion_depth_limit ) {
@@ -271,7 +276,7 @@ namespace detail {
    }; /// authority_checker
 
    template<typename PermissionToAuthorityFunc>
-   auto make_auth_checker( PermissionToAuthorityFunc&&          pta,
+   auto make_auth_checker( PermissionToAuthorityFunc&&          pta, // 根据permission_level实例获取auth的function类型
                            uint16_t                             recursion_depth_limit,
                            const flat_set<public_key_type>&     provided_keys,
                            const flat_set<permission_level>&    provided_permissions = flat_set<permission_level>(),
@@ -280,6 +285,7 @@ namespace detail {
                          )
    {
       auto noop_checktime = []() {};
+      // 此处有个std::function的细节，std::function的bool类型转换函数不能隐式调用，所以用强转显示调用了转换函数
       const auto& checktime = ( static_cast<bool>(_checktime) ? _checktime : noop_checktime );
       return authority_checker< PermissionToAuthorityFunc>( std::forward<PermissionToAuthorityFunc>(pta),
                                                             recursion_depth_limit,

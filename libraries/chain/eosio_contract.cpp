@@ -250,17 +250,17 @@ void apply_eosio_updateauth(apply_context& context) {
 
       int64_t old_size = (int64_t)(config::billable_size_v<permission_object> + permission->auth.get_billable_size());
 
-      authorization.modify_permission( *permission, update.auth );
+      authorization.modify_permission( *permission, update.auth ); // 更新权限
 
       int64_t new_size = (int64_t)(config::billable_size_v<permission_object> + permission->auth.get_billable_size());
 
-      context.add_ram_usage( permission->owner, new_size - old_size );
+      context.add_ram_usage( permission->owner, new_size - old_size ); // 修改占用内存大小
    } else {
-      const auto& p = authorization.create_permission( update.account, update.permission, parent_id, update.auth );
+      const auto& p = authorization.create_permission( update.account, update.permission, parent_id, update.auth ); // 创建新的权限
 
       int64_t new_size = (int64_t)(config::billable_size_v<permission_object> + p.auth.get_billable_size());
 
-      context.add_ram_usage( update.account, new_size );
+      context.add_ram_usage( update.account, new_size ); // 占用内存大小
    }
 }
 

@@ -1512,7 +1512,8 @@ struct controller_impl {
          }
       };
 
-      uint32_t num_producers = producers.size();
+      uint32_t num_producers = producers.size(); // 产块账号数量
+      // 计算新的阈值
       auto calculate_threshold = [=]( uint32_t numerator, uint32_t denominator ) {
          return ( (num_producers * numerator) / denominator ) + 1;
       };
