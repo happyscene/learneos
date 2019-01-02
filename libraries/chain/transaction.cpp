@@ -97,13 +97,13 @@ flat_set<public_key_type> transaction::get_signature_keys( const vector<signatur
       if( use_cache ) {
          recovery_cache_type::index<by_sig>::type::iterator it = recovery_cache.get<by_sig>().find( sig );
          if( it == recovery_cache.get<by_sig>().end() || it->trx_id != id()) {
-            recov = public_key_type( sig, digest );
+            recov = public_key_type( sig, digest ); // 由签名结果和trx的digest计算出public key
             recovery_cache.emplace_back(cached_pub_key{id(), recov, sig} ); //could fail on dup signatures; not a problem
          } else {
             recov = it->pub_key;
          }
       } else {
-         recov = public_key_type( sig, digest );
+         recov = public_key_type( sig, digest ); // 由签名结果和trx的digest计算出public key
       }
       bool successful_insertion = false;
       std::tie(std::ignore, successful_insertion) = recovered_pub_keys.insert(recov);

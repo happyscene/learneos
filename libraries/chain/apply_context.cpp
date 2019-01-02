@@ -141,6 +141,7 @@ bool apply_context::is_account( const account_name& account )const {
    return nullptr != db.find<account_object,by_name>( account );
 }
 
+// 验证执行action的权限
 void apply_context::require_authorization( const account_name& account ) {
    for( uint32_t i=0; i < act.authorization.size(); i++ ) {
      if( act.authorization[i].actor == account ) {
@@ -158,6 +159,7 @@ bool apply_context::has_authorization( const account_name& account )const {
   return false;
 }
 
+// 验证执行action的权限
 void apply_context::require_authorization(const account_name& account,
                                           const permission_name& permission) {
   for( uint32_t i=0; i < act.authorization.size(); i++ )

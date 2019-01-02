@@ -233,18 +233,19 @@ wallet_manager::sign_transaction(const chain::signed_transaction& txn, const fla
    chain::signed_transaction stxn(txn);
 
    for (const auto& pk : keys) {
-      bool found = false;
-      for (const auto& i : wallets) {
-         if (!i.second->is_locked()) {
+      bool found = false; // 标志钱包中是否存在此pulick key对应的私钥并签名成功
+      for (const auto& i : wallets) { // 遍历所有钱包
+         if (!i.second->is_locked()) { // 如果钱包不是lock状态，试着签名
             // 在try_sign_digest中，根据public key获取private key，使用private key签名，此处不能被伪造
             optional<signature_type> sig = i.second->try_sign_digest(stxn.sig_digest(id, stxn.context_free_data), pk);
             if (sig) {
                stxn.signatures.push_back(*sig); // 保存签名
-               found = true;
+               found = true; // 签名成功将found置为true
                break; // inner for
             }
          }
       }
+      // 只要有一个public key对应的私钥没有进行签名，则签名抛出异常，签名失败
       if (!found) {
          EOS_THROW(chain::wallet_missing_pub_key_exception, "Public key not found in unlocked wallets ${k}", ("k", pk));
       }

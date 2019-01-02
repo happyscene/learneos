@@ -580,6 +580,7 @@ namespace eosio { namespace chain {
                                         _noop_checktime
                                       );
 
+      // 验证交易中所有执行action的权限
       for (const auto& act : trx.actions ) {
          for (const auto& declared_auth : act.authorization) {
             //判断candidate_keys是否有合适的key被授予了act.authorization

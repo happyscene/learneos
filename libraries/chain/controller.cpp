@@ -1043,7 +1043,7 @@ struct controller_impl {
                // 校验权重
                authorization.check_authorization(
                        trx->trx.actions,
-                       trx->recover_keys( chain_id ), // 从签名里获取action发起者的public key（此处仔细看一下......）
+                       trx->recover_keys( chain_id ), // 从签名里获取action发起者的public key（用trx的digest和签名还原public key）
                        {},
                        trx_context.delay,
                        [](){}

@@ -49,6 +49,7 @@ class transaction_metadata {
                   return signing_keys->second;
                }
             }
+            // 获取参与签名的private key对应的public key
             signing_keys = std::make_pair( chain_id, trx.get_signature_keys( chain_id ));
          }
          return signing_keys->second;

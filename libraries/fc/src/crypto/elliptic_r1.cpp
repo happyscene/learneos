@@ -502,7 +502,7 @@ namespace fc { namespace crypto { namespace r1 {
       }
     }
 
-    bool       private_key::verify( const fc::sha256& digest, const fc::crypto::r1::signature& sig )
+    bool private_key::verify( const fc::sha256& digest, const fc::crypto::r1::signature& sig )
     {
       return 1 == ECDSA_verify( 0, (unsigned char*)&digest, sizeof(digest), (unsigned char*)&sig, sizeof(sig), my->_key );
     }
