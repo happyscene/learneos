@@ -72,7 +72,7 @@ namespace fc { namespace ecc {
             if (!eckey) FC_THROW_EXCEPTION( exception, "null key" );
 
             int ret = 0;
-            BN_CTX *ctx = NULL;
+            BN_CTX *ctx = NULL; // BN_CTX保存了库函数使用的BIGNUM类型的临时变量
 
             BIGNUM *x = NULL;
             BIGNUM *e = NULL;
@@ -88,17 +88,17 @@ namespace fc { namespace ecc {
             int n = 0;
             int i = recid / 2;
 
-            const EC_GROUP *group = EC_KEY_get0_group(eckey);
-            if ((ctx = BN_CTX_new()) == NULL) { ret = -1; goto err; }
-            BN_CTX_start(ctx);
-            order = BN_CTX_get(ctx);
-            if (!EC_GROUP_get_order(group, order, ctx)) { ret = -2; goto err; }
+            const EC_GROUP *group = EC_KEY_get0_group(eckey); // 返回与eckey关联的EC_GROUP
+            if ((ctx = BN_CTX_new()) == NULL) { ret = -1; goto err; } // 使用BN_CTX_new()实例化ctx
+            BN_CTX_start(ctx); // 开始使用ctx
+            order = BN_CTX_get(ctx); // 产生一个BIGNUM类型数据，并返回指针。出错的情况下，返回NULL。
+            if (!EC_GROUP_get_order(group, order, ctx)) { ret = -2; goto err; } // EC_GROUP_get_order获得R值
             x = BN_CTX_get(ctx);
             if (!BN_copy(x, order)) { ret=-1; goto err; }
             if (!BN_mul_word(x, i)) { ret=-1; goto err; }
             if (!BN_add(x, x, ecsig->r)) { ret=-1; goto err; }
             field = BN_CTX_get(ctx);
-            if (!EC_GROUP_get_curve_GFp(group, field, NULL, NULL, ctx)) { ret=-2; goto err; }
+            if (!EC_GROUP_get_curve_GFp(group, field, NULL, NULL, ctx)) { ret=-2; goto err; } // EC_GROUP_get_curve_GFp获得field(P)
             if (BN_cmp(x, field) >= 0) { ret=0; goto err; }
             if ((R = EC_POINT_new(group)) == NULL) { ret = -2; goto err; }
             if (!EC_POINT_set_compressed_coordinates_GFp(group, R, x, recid % 2, ctx)) { ret=0; goto err; }

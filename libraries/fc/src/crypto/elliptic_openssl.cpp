@@ -193,7 +193,7 @@ namespace fc { namespace ecc {
             public_key_data key_data;
             while( true )
             {
-                ecdsa_sig sig = ECDSA_do_sign((unsigned char*)&digest, sizeof(digest), my->_key);
+                ecdsa_sig sig = ECDSA_do_sign((unsigned char*)&digest, sizeof(digest), my->_key); // 对digest求ECDSA散列值
 
                 if (sig==nullptr)
                     FC_THROW_EXCEPTION( exception, "Unable to sign" );
@@ -201,19 +201,22 @@ namespace fc { namespace ecc {
                 compact_signature csig;
                 // memset( csig.data, 0, sizeof(csig) );
 
-                int nBitsR = BN_num_bits(sig->r);
-                int nBitsS = BN_num_bits(sig->s);
+                int nBitsR = BN_num_bits(sig->r); // 返回sig->r的二进制位数
+                int nBitsS = BN_num_bits(sig->s); // 返回sig->s的二进制位数
                 if (nBitsR <= 256 && nBitsS <= 256)
                 {
                     int nRecId = -1;
+                    // 通过椭圆曲线的标识符NID_secp256k1生成一个EC_KEY。
+                    // 这种方式生成的EC_KEY里包含了椭圆曲线的参数。否则，需要手动设置EC_GROUP。
                     EC_KEY* key = EC_KEY_new_by_curve_name( NID_secp256k1 );
                     FC_ASSERT( key );
-                    EC_KEY_set_conv_form( key, POINT_CONVERSION_COMPRESSED );
+                    EC_KEY_set_conv_form( key, POINT_CONVERSION_COMPRESSED ); // 构造椭圆曲线的基点
                     for (int i=0; i<4; i++)
                     {
                         if (detail::public_key_impl::ECDSA_SIG_recover_key_GFp(key, sig, (unsigned char*)&digest, sizeof(digest), i, 1) == 1)
                         {
                             unsigned char* buffer = (unsigned char*) key_data.begin();
+                            // 导出公钥
                             i2o_ECPublicKey( key, &buffer ); // FIXME: questionable memory handling
                             if ( key_data == my_pub_key )
                             {
@@ -222,13 +225,14 @@ namespace fc { namespace ecc {
                             }
                         }
                     }
-                    EC_KEY_free( key );
+                    EC_KEY_free( key ); // 释放key占用内存
 
                     if (nRecId == -1)
                     {
                         FC_THROW_EXCEPTION( exception, "unable to construct recoverable key");
                     }
                     unsigned char* result = nullptr;
+                    // 创建一个DER编码的ECDSA签名，并把结果输出到result。返回结果为签名的长度，如果签名失败返回0。
                     auto bytes = i2d_ECDSA_SIG( sig, &result );
                     auto lenR = result[3];
                     auto lenS = result[5+lenR];
@@ -238,8 +242,8 @@ namespace fc { namespace ecc {
                     //idump( (33-(nBitsR+7)/8) );
                     //idump( (65-(nBitsS+7)/8) );
                     //idump( (sizeof(csig) ) );
-                    memcpy( &csig.data[1], &result[4], lenR );
-                    memcpy( &csig.data[33], &result[6+lenR], lenS );
+                    memcpy( &csig.data[1], &result[4], lenR ); // 把r拷贝到csig.data中
+                    memcpy( &csig.data[33], &result[6+lenR], lenS ); // 把s拷贝到csig.data中
                     //idump( (csig.data[33]) );
                     //idump( (csig.data[1]) );
                     free(result);
