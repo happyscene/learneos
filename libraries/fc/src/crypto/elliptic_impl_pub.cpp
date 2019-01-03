@@ -129,8 +129,8 @@ namespace fc { namespace ecc {
 
         err:
             if (ctx) {
-                BN_CTX_end(ctx);
-                BN_CTX_free(ctx);
+                BN_CTX_end(ctx); // 清空ctx
+                BN_CTX_free(ctx); // 释放ctx占用内存
             }
             if (R != NULL) EC_POINT_free(R);
             if (O != NULL) EC_POINT_free(O);
