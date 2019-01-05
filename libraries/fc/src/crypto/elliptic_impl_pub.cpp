@@ -76,13 +76,13 @@ namespace fc { namespace ecc {
 
             BIGNUM *x = NULL;
             BIGNUM *e = NULL;
-            BIGNUM *order = NULL;
+            BIGNUM *order = NULL; // 子群阶数
             BIGNUM *sor = NULL;
             BIGNUM *eor = NULL;
-            BIGNUM *field = NULL;
+            BIGNUM *field = NULL; // 质数模数
             EC_POINT *R = NULL;
             EC_POINT *O = NULL;
-            EC_POINT *Q = NULL;
+            EC_POINT *Q = NULL; // 公钥
             BIGNUM *rr = NULL;
             BIGNUM *zero = NULL;
             int n = 0;
@@ -92,14 +92,14 @@ namespace fc { namespace ecc {
             if ((ctx = BN_CTX_new()) == NULL) { ret = -1; goto err; } // 使用BN_CTX_new()实例化ctx
             BN_CTX_start(ctx); // 开始使用ctx
             order = BN_CTX_get(ctx); // 产生一个BIGNUM类型数据，并返回指针。出错的情况下，返回NULL。
-            if (!EC_GROUP_get_order(group, order, ctx)) { ret = -2; goto err; } // EC_GROUP_get_order获得R值
+            if (!EC_GROUP_get_order(group, order, ctx)) { ret = -2; goto err; } // 取出子群阶数
             x = BN_CTX_get(ctx);
             if (!BN_copy(x, order)) { ret=-1; goto err; }
             if (!BN_mul_word(x, i)) { ret=-1; goto err; } // x *= i
             if (!BN_add(x, x, ecsig->r)) { ret=-1; goto err; } // x = x + ecsig->r
             field = BN_CTX_get(ctx);
-            if (!EC_GROUP_get_curve_GFp(group, field, NULL, NULL, ctx)) { ret=-2; goto err; } // EC_GROUP_get_curve_GFp获得field(P)
-            if (BN_cmp(x, field) >= 0) { ret=0; goto err; } // BN_cmp(a, b) returns -1 if a < b, 0 if a == b and 1 if a > b. 
+            if (!EC_GROUP_get_curve_GFp(group, field, NULL, NULL, ctx)) { ret=-2; goto err; } // 取出质数模数
+            if (BN_cmp(x, field) >= 0) { ret=0; goto err; } // x < field 返回 -1，x == field 返回 0，x > field 返回 1
             if ((R = EC_POINT_new(group)) == NULL) { ret = -2; goto err; }
             // int EC_POINT_set_compressed_coordinates_GFp(const EC_GROUP *group,  EC_POINT *p, const BIGNUM *x, int y_bit, BN_CTX *ctx);
             // 素数域椭圆曲线，给定压缩坐标和y_bit参数，设置point的几何坐标；用于将Octet-String转化为椭圆曲线上的点
@@ -108,13 +108,13 @@ namespace fc { namespace ecc {
             {
                 if ((O = EC_POINT_new(group)) == NULL) { ret = -2; goto err; }
                 // int EC_POINT_mul(const EC_GROUP *group, EC_POINT *r, const BIGNUM *n, const EC_POINT *q, const BIGNUM *m, BN_CTX *ctx);
-                // 计算r=generator*n+q*m，n可以为空，即r=q*m 成功返回1，失败返回0
+                // 计算r=G点*n+q*m，n可以为空，即r=q*m 成功返回1，失败返回0
                 if (!EC_POINT_mul(group, O, NULL, R, order, ctx)) { ret=-2; goto err; }
                 // 测试O是否为无限远点，返回1位无限远点，返回0则不是
                 if (!EC_POINT_is_at_infinity(group, O)) { ret = 0; goto err; }
             }
             if ((Q = EC_POINT_new(group)) == NULL) { ret = -2; goto err; }
-            // 得到域的阶。对于素数域会得到p的bit数，对于二进制域F2^m，会得到m。
+            // 得到有限域的阶（元素个数）
             n = EC_GROUP_get_degree(group);
             e = BN_CTX_get(ctx);
             if (!BN_bin2bn(msg, msglen, e)) { ret=-1; goto err; }
@@ -132,7 +132,7 @@ namespace fc { namespace ecc {
             if (!BN_mod_mul(sor, ecsig->s, rr, order, ctx)) { ret=-1; goto err; } // sor = (ecsig->s * rr) mode order
             eor = BN_CTX_get(ctx);
             if (!BN_mod_mul(eor, e, rr, order, ctx)) { ret=-1; goto err; } // eor = (e * rr) mode order
-            if (!EC_POINT_mul(group, Q, eor, R, sor, ctx)) { ret=-2; goto err; }
+            if (!EC_POINT_mul(group, Q, eor, R, sor, ctx)) { ret=-2; goto err; } // Q = G*eor + R*sor
             if (!EC_KEY_set_public_key(eckey, Q)) { ret=-2; goto err; }
 
             ret = 1;
