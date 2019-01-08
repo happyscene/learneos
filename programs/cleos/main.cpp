@@ -333,7 +333,7 @@ fc::variant push_transaction( signed_transaction& trx, int32_t extra_kcpu = 1000
 
    if (!tx_skip_sign) {
       auto required_keys = determine_required_keys(trx); // 获取被授权的public key
-      sign_transaction(trx, required_keys, info.chain_id); // 通过签名交易提交permission证明
+      sign_transaction(trx, required_keys, info.chain_id); // 对交易进行签名
    }
 
    if (!tx_dont_broadcast) {
